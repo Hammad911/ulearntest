@@ -45,7 +45,7 @@ semantic-search/
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.11
 - Node.js 18+
 - Pinecone account
 - Google API key with access to Gemini models
@@ -174,9 +174,6 @@ The system includes comprehensive error handling for:
 4. Push to the branch
 5. Create a Pull Request
 
-## License
-
-[Your chosen license]
 
 ## Support
 
