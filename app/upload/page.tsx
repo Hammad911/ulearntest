@@ -1,65 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Heart, Share2, BookOpen, Brain } from 'lucide-react'
-import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 
-interface Message {
-  id: number
-  role: 'user' | 'assistant'
-  content: string
-  avatar: string
-}
-
-const MedicalResponse = ({ content }: { content: string }) => {
-  const parseResponse = (text: string) => {
-    const source = text.match(/\[SOURCE: ([^\]]+)\]/)?.[1] || '';
-    const sections = {
-      textbook: '',
-      aiGenerated: ''
-    };
-
-    // Remove the source tag from the beginning
-    const contentWithoutSource = text.replace(/^\[SOURCE:[^\]]+\]/, '').trim();
-
-    if (contentWithoutSource.includes('Based on the Medical Text Reference:')) {
-      const [aiPart, textbookPart] = contentWithoutSource.split('Based on the Medical Text Reference:');
-      sections.textbook = textbookPart?.trim() || '';
-      sections.aiGenerated = aiPart?.trim() || '';
-    } else {
-      sections.aiGenerated = contentWithoutSource
-        .replace(/While Davidson's textbook does not contain specific information about/, '')
-        .trim();
-    }
-
-    return { source, ...sections };
-  };
-
-  const { source, textbook, aiGenerated } = parseResponse(content);
-
-  return (
-    <div className="space-y-4 w-full">
-      <div className="text-purple-300 text-sm tracking-wider mb-2">
-        Source: {source}
-      </div>
-      
-      {textbook && (
-        <div className="bg-purple-900/30 backdrop-blur-sm rounded-lg p-6 space-y-3">
-          <div className="flex items-center gap-2 text-purple-300">
-            <BookOpen className="w-5 h-5" />
-            <span className="font-semibold">Medical Text Reference</span>
-          </div>
-          <div className="text-white/90 leading-relaxed whitespace-pre-line">
-            {textbook}
-          </div>
-        </div>
-      )}
-
-      
-    </div>
-  );
-};
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -68,7 +10,6 @@ export default function Home() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [details, setDetails] = useState('');
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,4 +121,3 @@ export default function Home() {
     </div>
   );
 }
-

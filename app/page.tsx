@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Heart, Share2, BookOpen, Brain, Search, Upload, MessageCircle } from 'lucide-react'
+import { BookOpen, Brain, Search, Upload, MessageCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface SearchResult {
