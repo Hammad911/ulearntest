@@ -10,12 +10,13 @@ const pc = new Pinecone({
 
 if (!process.env.PINECONE_INDEX_HOST) throw new Error('PINECONE_INDEX_HOST is not set')
 
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro-exp-03-25' })
 
 interface SearchResult {
   text: string;
   score: number;
   chunkNumber: string | number | boolean | null;
+  source?: string;
 }
 
 async function generateEmbedding(text: string, maxRetries = 3): Promise<number[]> {
@@ -56,7 +57,7 @@ async function semanticSearch(query: string, topK = 3, minScore = 0.5): Promise<
     
     console.log("Searching in Pinecone index...")
     const index = await connectToPinecone(process.env.PINECONE_INDEX_NAME!)
-    const queryResponse = await index.namespace('medical_book_vectors').query({
+    const queryResponse = await index.namespace('default').query({
       vector: queryEmbedding,
       topK,
       includeMetadata: true,
@@ -68,7 +69,8 @@ async function semanticSearch(query: string, topK = 3, minScore = 0.5): Promise<
         const result = {
           text: match.metadata?.text as string,
           score: match.score as number,
-          chunkNumber: match.metadata?.chunk_number != null ? String(match.metadata.chunk_number) : 'N/A'
+          chunkNumber: match.metadata?.chunk_number != null ? String(match.metadata.chunk_number) : 'N/A',
+          source: match.metadata?.source as string || 'Unknown source'
         };
         console.log(`\nFound match with similarity score: ${result.score.toFixed(4)}`);
         console.log(`Text excerpt (Chunk ${result.chunkNumber}):`);
@@ -78,9 +80,9 @@ async function semanticSearch(query: string, topK = 3, minScore = 0.5): Promise<
       });
 
     if (results.length > 0) {
-      console.log(`\nFound ${results.length} relevant passages from Davidson's Medical Textbook`);
+      console.log(`\nFound ${results.length} relevant passages from the knowledge base`);
     } else {
-      console.log('\nNo relevant passages found in the medical textbook');
+      console.log('\nNo relevant passages found in the knowledge base');
     }
 
     return results;
@@ -92,7 +94,7 @@ async function semanticSearch(query: string, topK = 3, minScore = 0.5): Promise<
 
 async function assessContextRelevance(query: string, context: string): Promise<boolean> {
   try {
-    const assessmentPrompt = `Analyze if the following medical text context is relevant to the query.
+    const assessmentPrompt = `Analyze if the following text context is relevant to the query.
     Query: ${query}
     Context: ${context}
     Determine:
@@ -114,55 +116,55 @@ async function getGeminiResponse(query: string, context?: string): Promise<strin
     const isRelevant = context ? await assessContextRelevance(query, context) : false
 
     const prompt = context && isRelevant
-      ? `You are a medical information assistant. Using the provided medical text, answer the following query.
+      ? `You are a knowledgeable assistant. Using the provided reference text, answer the following query.
       
       Query: ${query}
 
-      Medical Text Reference:
+      Reference Text:
       ${context}
 
       Format your response EXACTLY as follows:
-      [SOURCE: Medical Text Reference]
-      Based on the Medical Text Reference: <write a comprehensive summary of the specific information from the provided text, maintaining medical accuracy and detail>
+      [SOURCE: Reference Text]
+      Based on the Reference Text: <write a comprehensive summary of the specific information from the provided text, maintaining accuracy and detail>
 
-      Please note: This response is based on Davidson's Principles and Practice of Medicine. Always consult healthcare professionals for personal medical advice.`
-      : `You are a medical information assistant. Provide a comprehensive response to the following query:
+      Please note: This response is based on information from our reference library. Always verify important information with additional sources.`
+      : `You are a knowledgeable assistant. Provide a comprehensive response to the following query:
       
       Query: ${query}
 
       Format your response EXACTLY as follows:
       [SOURCE: GENERATED - NO RELEVANT TEXT]
-      While Davidson's textbook does not contain specific information about ${query}, I can provide a helpful general medical response:
+      Our reference library does not contain specific information about ${query}, but I can provide a helpful general response:
 
       <Provide a comprehensive response that includes:
-      1. Definition/explanation of the condition/topic
-      2. Common symptoms or characteristics if applicable
-      3. General medical information about the topic
-      4. Standard medical guidance when appropriate>
+      1. Definition/explanation of the topic
+      2. Common characteristics or key points if applicable
+      3. General information about the topic
+      4. Standard guidance when appropriate>
 
-      Important note: This information is based on general medical knowledge. Please consult healthcare professionals for personal medical advice and accurate diagnosis.`
+      Important note: This information is based on general knowledge. Please verify this information with trusted sources for critical decisions.`
 
     const result = await model.generateContent(prompt)
     const response = result.response.text()
 
     if (!response || response.trim() === '') {
       return `[SOURCE: ERROR] 
-      Unable to generate a specific response. However, for any medical concerns, it's always recommended to:
-      1. Consult with a qualified healthcare provider
-      2. Seek emergency care if symptoms are severe
-      3. Keep track of your symptoms and when they occur
-      4. Bring a list of your current medications to medical appointments`
+      Unable to generate a specific response. However, for this topic, it's always recommended to:
+      1. Consult with qualified experts in the field
+      2. Check multiple sources for verification
+      3. Consider the context and specific details of your question
+      4. Look for recent information as knowledge evolves over time`
     }
 
     return response
   } catch (error) {
     console.error('Error generating response:', error)
     return `[SOURCE: ERROR] 
-    Unable to generate a specific response due to a technical error. However, for any medical concerns, please:
-    1. Consult with a qualified healthcare provider
-    2. Seek emergency care if symptoms are severe
-    3. Keep track of your symptoms and when they occur
-    4. Bring a list of your current medications to medical appointments
+    Unable to generate a specific response due to a technical error. However, for this topic, please:
+    1. Consult with qualified experts in the field
+    2. Check multiple sources for verification
+    3. Consider the context and specific details of your question
+    4. Look for recent information as knowledge evolves over time
     
     Technical error details: ${error instanceof Error ? error.message : 'Unknown error'}`
   }
@@ -183,7 +185,7 @@ export async function POST(req: Request) {
     console.log('\nProcessing search results...');
 
     const combinedContext = results.length > 0 
-      ? results.map(r => `[Excerpt (Similarity: ${r.score.toFixed(4)})]\n${r.text}`).join('\n\n')
+      ? results.map(r => `[Excerpt (Similarity: ${r.score.toFixed(4)}, Source: ${r.source || 'Unknown'})]\n${r.text}`).join('\n\n')
       : undefined
     
     try {
@@ -192,7 +194,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         results: results.map(r => ({
           ...r,
-          text: `[Similarity Score: ${r.score.toFixed(4)}]\n${r.text}`
+          text: `[Similarity Score: ${r.score.toFixed(4)}, Source: ${r.source || 'Unknown'}]\n${r.text}`
         })),
         aiResponse,
         hasContext: !!combinedContext
@@ -215,4 +217,3 @@ export async function POST(req: Request) {
     )
   }
 }
-

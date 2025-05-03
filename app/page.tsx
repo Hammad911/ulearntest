@@ -1,17 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Heart, Share2, BookOpen, Brain } from 'lucide-react'
-import Image from 'next/image'
+import { useState } from 'react'
+import { Heart, Share2, BookOpen, Brain, Search, Upload, MessageCircle } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
-interface Message {
-  id: number
-  role: 'user' | 'assistant'
-  content: string
-  avatar: string
+interface SearchResult {
+  text: string;
+  score: number;
+  chunkNumber: string | number | boolean | null;
 }
 
-const MedicalResponse = ({ content }: { content: string }) => {
+interface MedicalResponseProps {
+  content: string;
+}
+
+const MedicalResponse = ({ content }: MedicalResponseProps) => {
   const parseResponse = (text: string) => {
     const source = text.match(/\[SOURCE: ([^\]]+)\]/)?.[1] || '';
     const sections = {
@@ -55,40 +58,35 @@ const MedicalResponse = ({ content }: { content: string }) => {
         </div>
       )}
 
-      
+      <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 space-y-3">
+        <div className="flex items-center gap-2 text-blue-300">
+          <Brain className="w-5 h-5" />
+          <span className="font-semibold">AI Response</span>
+        </div>
+        <div className="text-white/90 leading-relaxed whitespace-pre-line">
+          {aiGenerated}
+        </div>
+      </div>
     </div>
   );
 };
 
-export default function MedicalSearch() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [showHero, setShowHero] = useState(true)
+export default function Home() {
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [aiResponse, setAiResponse] = useState('');
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (messages.length > 0 && showHero) {
-      const timer = setTimeout(() => {
-        setShowHero(false)
-      }, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [messages.length, showHero])
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!input.trim() || isLoading) return
-
-    const userMessage = {
-      id: messages.length + 1,
-      role: 'user' as const,
-      content: input,
-      avatar: '/boy.jpg'
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setInput('')
-    setIsLoading(true)
+    setLoading(true);
+    setError('');
+    setResults([]);
+    setAiResponse('');
 
     try {
       const response = await fetch('/api/search', {
@@ -96,175 +94,114 @@ export default function MedicalSearch() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: input }),
-      })
+        body: JSON.stringify({ query: query.trim() }),
+      });
+
+      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error('Search failed')
+        throw new Error(data.error || 'Failed to search');
       }
 
-      const data = await response.json()
-      
-      const aiMessage = {
-        id: messages.length + 2,
-        role: 'assistant' as const,
-        content: data.aiResponse,
-        avatar: '/doctor.jpg'
-      }
-
-      setMessages(prev => [...prev, aiMessage])
-    } catch (error) {
-      console.error('Error:', error)
-      const errorMessage = {
-        id: messages.length + 2,
-        role: 'assistant' as const,
-        content: 'Sorry, there was an error processing your request. Please try again.',
-        avatar: '/bualisina.jpg'
-      }
-      setMessages(prev => [...prev, errorMessage])
+      setResults(data.results || []);
+      setAiResponse(data.aiResponse || '');
+    } catch (err) {
+      console.error('Search error:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred during search');
     } finally {
-      setIsLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  const navigateToUpload = () => {
+    router.push('/upload');
+  };
+
+  const navigateToChatbot = () => {
+    router.push('/chat');
+  };
 
   return (
-    <div className="min-h-screen bg-[#1a0b2e] text-white relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900/20 to-pink-600/20 z-0" />
-      <div className="fixed top-0 right-0 w-2/3 h-2/3 bg-gradient-to-bl from-purple-600/30 to-pink-500/30 blur-3xl z-0" />
-      
-      {/* Background Image */}
-      <div className="fixed inset-0 z-0">
-        <Image
-          src="/bualisina.jpg"
-          alt="Bu Ali Sina Background"
-          fill
-          style={{ objectFit: 'cover' }}
-          className="opacity-20 mix-blend-overlay"
-        />
-      </div>
-      
-      {/* Content */}
-      <div className="relative z-10 min-h-screen">
-        {/* Header */}
-        <header className="fixed top-0 left-0 right-0 p-6 flex justify-between items-center bg-[#1a0b2e]/50 backdrop-blur-sm z-50">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-white/20 backdrop-blur-sm">
-              <Image
-                src="/bualisina.jpg"
-                alt="Bu Ali Sina"
-                width={32}
-                height={32}
-                className="w-full h-full object-cover mix-blend-overlay"
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold text-center mt-8 mb-6">Medical Knowledge Search</h1>
+        
+        {/* Navigation Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+          <button
+            onClick={navigateToUpload}
+            className="py-4 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200"
+          >
+            <Upload className="w-5 h-5" />
+            <span>Upload Medical Textbook</span>
+          </button>
+          
+          <button
+            onClick={navigateToChatbot}
+            className="py-4 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200"
+          >
+            <MessageCircle className="w-5 h-5" />
+            <span>Go to Medical Chatbot</span>
+          </button>
+        </div>
+        
+        <div className="border-t border-gray-700 my-6"></div>
+        
+        <form onSubmit={handleSearch} className="mb-8">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="relative flex-grow">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Ask a medical question..."
+                className="w-full py-3 px-4 pr-12 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
               />
-            </div>
-            <span className="text-white/90 tracking-wider font-medium">MEDICAL ASSISTANT</span>
-          </div>
-          <div className="flex gap-4">
-            <button className="w-12 h-12 rounded-full bg-purple-900/40 backdrop-blur-sm flex items-center justify-center">
-              <Heart className="w-5 h-5" />
-            </button>
-            <button className="w-12 h-12 rounded-full bg-purple-900/40 backdrop-blur-sm flex items-center justify-center">
-              <Share2 className="w-5 h-5" />
-            </button>
-          </div>
-        </header>
-
-        {/* Hero Section */}
-        <div
-          className={`transition-all duration-500 ease-in-out ${
-            showHero 
-              ? 'opacity-100 translate-y-0' 
-              : 'opacity-0 -translate-y-full absolute'
-          }`}
-        >
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center space-y-4">
-              <div className="text-purple-400 text-sm tracking-wider">AI MEDICAL SEARCH</div>
-              <h1 className="text-6xl font-bold tracking-wide">
-                <div>MEDICAL</div>
-                <div>ASSISTANT</div>
-              </h1>
-              <div className="text-purple-400 text-sm tracking-wider">POWERED BY DAVIDSON&apos;S MEDICINE</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Chat Messages */}
-        <div 
-          className={`px-6 transition-all duration-500 ease-in-out ${
-            showHero 
-              ? 'opacity-0' 
-              : 'opacity-100'
-          }`}
-        >
-          <div className="max-w-5xl mx-auto pt-24 pb-32">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex items-start gap-4 mb-8 ${
-                  message.role === 'assistant' ? 'flex-row-reverse' : ''
-                }`}
-              >
-                <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                  <Image
-                    src={message.avatar}
-                    alt={`${message.role} avatar`}
-                    width={40}
-                    height={40}
-                    className="w-full h-full object-cover"
-                  />
+              {loading && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="w-5 h-5 border-2 border-gray-300 border-t-purple-500 rounded-full animate-spin"></div>
                 </div>
-                <div
-                  className={`rounded-lg ${
-                    message.role === 'assistant'
-                      ? 'ml-auto'
-                      : 'bg-purple-900/40 backdrop-blur-sm mr-auto p-6'
-                  } max-w-[85%]`}
-                >
-                  {message.role === 'assistant' ? (
-                    <MedicalResponse content={message.content} />
-                  ) : (
-                    <div className="text-lg font-inter leading-relaxed">
-                      {message.content}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-center">
-                <div className="animate-pulse text-purple-400 text-lg">Processing your query...</div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Input Form */}
-        <form 
-          onSubmit={handleSubmit}
-          className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#1a0b2e] to-[#1a0b2e]/95 z-50"
-        >
-          <div className="max-w-5xl mx-auto flex gap-4">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask a medical question..."
-              className="flex-1 bg-purple-900/20 backdrop-blur-sm rounded-full px-8 py-5 text-lg font-inter text-white placeholder-purple-300/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-              disabled={isLoading}
-            />
+              )}
+            </div>
             <button
               type="submit"
-              className="px-10 py-5 bg-purple-600 hover:bg-purple-700 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
-              disabled={isLoading}
+              disabled={loading || !query.trim()}
+              className="py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-2 disabled:bg-gray-600 disabled:cursor-not-allowed"
             >
-              SUBMIT
+              <Search className="w-5 h-5" />
+              <span>Search</span>
             </button>
           </div>
         </form>
+
+        {error && (
+          <div className="bg-red-900/30 text-red-300 p-4 rounded-lg mb-6">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {aiResponse && (
+          <div className="mb-8">
+            <MedicalResponse content={aiResponse} />
+          </div>
+        )}
+
+        {results.length > 0 && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-semibold text-gray-300 border-b border-gray-700 pb-2">Related Text Passages</h2>
+            {results.map((result, index) => (
+              <div key={index} className="bg-gray-800/50 p-4 rounded-lg">
+                <div className="text-sm text-gray-400 mb-2">
+                  Similarity Score: {result.score.toFixed(4)} | Chunk: {result.chunkNumber}
+                </div>
+                <div className="text-gray-300 whitespace-pre-line">
+                  {result.text.replace(/\[Similarity Score: [0-9.]+\]\n/, '')}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }
-
