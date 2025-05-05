@@ -1,0 +1,121 @@
+import { NextResponse } from 'next/server';
+import { Pinecone } from '@pinecone-database/pinecone';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Initialize with error handling
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+const pc = new Pinecone({
+  apiKey: process.env.PINECONE_API_KEY!
+});
+
+if (!process.env.PINECONE_INDEX_HOST) throw new Error('PINECONE_INDEX_HOST is not set');
+
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro-exp-03-25" });
+
+// Function to generate embeddings using Gemini
+async function generateEmbedding(text: string, maxRetries = 3): Promise<number[]> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const embeddingModel = genAI.getGenerativeModel({ model: 'models/embedding-001' });
+      const result = await embeddingModel.embedContent(text);
+      const embedding = result.embedding;
+      return Array.isArray(embedding) ? embedding : Object.values(embedding);
+    } catch (error) {
+      console.error(`Embedding attempt ${attempt + 1} failed:`, error);
+      if (attempt < maxRetries - 1) {
+        const waitTime = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      } else {
+        throw new Error('Failed to generate embedding after all retries');
+      }
+    }
+  }
+  throw new Error('Failed to generate embedding');
+}
+
+async function connectToPinecone(indexName: string) {
+  try {
+    const index = pc.index(indexName, process.env.PINECONE_INDEX_HOST!);
+    console.log(`Successfully connected to Pinecone index: ${indexName}`);
+    return index;
+  } catch (error) {
+    console.error(`Failed to connect to Pinecone index: ${indexName}`, error);
+    throw new Error(`Failed to connect to Pinecone index: ${indexName}`);
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const { query, count = 5, subject } = await req.json();
+
+    if (!query) {
+      return NextResponse.json(
+        { error: 'Query is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!subject) {
+      return NextResponse.json(
+        { error: 'Subject is required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate count
+    const validCount = Math.min(Math.max(parseInt(count.toString()), 1), 20);
+    if (isNaN(validCount)) {
+      return NextResponse.json(
+        { error: 'Invalid MCQ count' },
+        { status: 400 }
+      );
+    }
+
+    // Generate embedding for the query
+    const embedding = await generateEmbedding(query);
+
+    // Use the subject name directly as the index name
+    const indexName = subject;
+
+    // Connect to Pinecone and query
+    const index = await connectToPinecone(indexName);
+    const queryResponse = await index.namespace('default').query({
+      vector: embedding,
+      topK: Math.min(validCount * 2, 20), // Get more context for more MCQs
+      includeMetadata: true,
+    });
+
+    // Extract relevant context from Pinecone results
+    const context = queryResponse.matches
+      .map((match) => match.metadata?.text || '')
+      .join('\n\n');
+
+    // Create a prompt for MCQ generation
+    const prompt = `Based on the following context from ${subject} textbooks, generate ${validCount} multiple-choice questions. Each question should have 4 options (A, B, C, D) with one correct answer. Mark the correct answer with an asterisk (*).
+
+Format each question like this:
+Question 1: [Question text]
+Options:
+A) [Option 1]
+B) [Option 2]
+C) [Option 3]*
+D) [Option 4]
+
+Context:
+${context}
+
+Generate ${validCount} MCQs that test understanding of the key concepts in the context. Make sure the questions are clear, the options are plausible, and only one answer is correct.`;
+
+    // Get response from Gemini
+    const result = await model.generateContent(prompt);
+    const response = result.response.text();
+
+    return NextResponse.json({ response });
+  } catch (error) {
+    console.error('MCQ generation error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate MCQs' },
+      { status: 500 }
+    );
+  }
+}

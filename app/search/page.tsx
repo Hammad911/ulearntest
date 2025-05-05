@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { BookOpen, Brain, Search, Upload } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { BookOpen, Brain, Search, FileQuestion } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface SearchResult {
@@ -22,7 +23,6 @@ const MedicalResponse = ({ content }: MedicalResponseProps) => {
       aiGenerated: ''
     };
 
-    // Remove the source tag from the beginning
     const contentWithoutSource = text.replace(/^\[SOURCE:[^\]]+\]/, '').trim();
 
     if (contentWithoutSource.includes('Based on the Text Reference:')) {
@@ -71,17 +71,26 @@ const MedicalResponse = ({ content }: MedicalResponseProps) => {
   );
 };
 
-export default function Home() {
+export default function SearchPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const subject = searchParams.get('subject');
+  
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [aiResponse, setAiResponse] = useState('');
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (!subject) {
+      router.push('/subjects');
+    }
+  }, [subject, router]);
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
+    if (!query.trim() || !subject) return;
 
     setLoading(true);
     setError('');
@@ -94,7 +103,10 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: query.trim() }),
+        body: JSON.stringify({ 
+          query: query.trim(),
+          subject: subject
+        }),
       });
 
       const data = await response.json();
@@ -113,39 +125,27 @@ export default function Home() {
     }
   };
 
-  const navigateToUpload = () => {
-    router.push('/upload');
+  const navigateToMCQ = () => {
+    router.push(`/mcqs?subject=${subject}`);
   };
 
-  const navigateToSubjects = () => {
-    router.push('/subjects');
-  };
+  if (!subject) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mt-8 mb-6">Knowledge Search</h1>
-        
-        {/* Navigation Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold capitalize">{subject} Search</h1>
           <button
-            onClick={navigateToUpload}
-            className="py-4 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200"
+            onClick={navigateToMCQ}
+            className="py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200"
           >
-            <Upload className="w-5 h-5" />
-            <span>Upload Textbook</span>
-          </button>
-          
-          <button
-            onClick={navigateToSubjects}
-            className="py-4 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200"
-          >
-            <BookOpen className="w-5 h-5" />
-            <span>Browse Subjects</span>
+            <FileQuestion className="w-5 h-5" />
+            <span>Practice MCQs</span>
           </button>
         </div>
-        
-        <div className="border-t border-gray-700 my-6"></div>
         
         <form onSubmit={handleSearch} className="mb-8">
           <div className="flex flex-col md:flex-row gap-3">
@@ -154,7 +154,7 @@ export default function Home() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ask a question..."
+                placeholder={`Ask a question about ${subject}...`}
                 className="w-full py-3 px-4 pr-12 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
               />
               {loading && (
