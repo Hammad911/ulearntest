@@ -8,8 +8,6 @@ const pc = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 })
 
-if (!process.env.PINECONE_INDEX_HOST) throw new Error('PINECONE_INDEX_HOST is not set')
-
 const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro-exp-03-25' })
 
 // Function to generate embeddings using Gemini
@@ -35,8 +33,10 @@ async function generateEmbedding(text: string, maxRetries = 3): Promise<number[]
 
 async function connectToPinecone(indexName: string) {
   try {
-    const index = pc.index(indexName, process.env.PINECONE_INDEX_HOST!)
-    console.log(`Successfully connected to Pinecone index: ${indexName}`)
+    // Construct the host URL based on the subject
+    const host = `https://${indexName.toLowerCase()}-ofj8ue3.svc.aped-4627-b74a.pinecone.io`
+    const index = pc.index(indexName, host)
+    console.log(`Successfully connected to Pinecone index: ${indexName} at ${host}`)
     return index
   } catch (error) {
     console.error(`Failed to connect to Pinecone index: ${indexName}`, error)
@@ -82,26 +82,36 @@ export async function POST(req: Request) {
       .join('\n\n')
 
     // Create a prompt for the AI
-    const prompt = `Based on the following context from ${subject} textbooks, provide a comprehensive answer to the question. If the context doesn't contain enough information, say so.
+    const prompt = `You are a ${subject} information retrieval system. Your task is to provide information exclusively from the textbook content.
 
 Question: ${query}
 
-Context:
+Textbook content:
 ${context}
 
-Provide a detailed answer that:
-1. Directly addresses the question
-2. Uses information from the provided context
-3. Is clear and well-structured
-4. Includes relevant examples or explanations where appropriate
+Instructions:
+1. Use ONLY the provided textbook content - do not add external information
+2. Present the information exactly as it appears in the textbook
+3. Remove references to figures, tables, or diagrams
+4. If the textbook content is not relevant to the question, state this clearly
+5. Maintain the exact technical terminology and accuracy from the textbook
+6. Keep the response focused on the textbook content only
+7. If multiple relevant sections exist, combine them while maintaining book accuracy
+8. If the content is too short (less than 2-3 sentences), expand the response by:
+   - Providing more context from surrounding content
+   - Explaining related concepts mentioned in the text
+   - Breaking down complex terms or ideas
+   - Adding relevant examples from the text
+   - Maintaining the exact terminology and accuracy from the textbook
+9. If the content is too long, prioritize the most important parts that directly answer the question
 
-Format your response like this:
+Format your response:
 [SOURCE: ${subject} Textbook]
-[Your answer here]
+[Textbook content with elaboration if needed]
 
-If the context doesn't contain enough information, start your response with:
+If the textbook content is not relevant:
 [SOURCE: ${subject} Textbook]
-While the ${subject} textbook does not contain specific information about [topic], I can provide a general explanation...`;
+The textbook does not contain information about [topic].`;
 
     // Get response from Gemini
     const result = await model.generateContent(prompt)

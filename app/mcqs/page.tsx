@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Send, ArrowRight, CheckCircle2, XCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 interface MCQ {
   question: string;
@@ -19,7 +20,7 @@ interface QuizState {
   score: number;
 }
 
-export default function MCQPage() {
+function MCQPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const subject = searchParams.get('subject');
@@ -152,12 +153,14 @@ export default function MCQPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mt-8 mb-6 capitalize">{subject} MCQ Generator</h1>
-
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[linear-gradient(135deg,_#e0f2fe_0%,_#f0f9ff_20%,_#ffe4e6_40%,_#bae6fd_60%,_#a5f3fc_100%)] text-[#222] p-4">
+      <div className="max-w-4xl w-full flex flex-col items-center">
+        <Image src="/High Res Logo Ulearn Black.svg" alt="ULearn Logo" width={320} height={140} className="mb-8 mt-8" />
+        <h1 className="text-3xl font-bold text-center mb-8 capitalize" style={{ color: '#1e88a8' }}>
+          {subject} MCQ Generator
+        </h1>
         {!quizState.mcqs.length ? (
-          <form onSubmit={handleSubmit} className="mb-8">
+          <form onSubmit={handleSubmit} className="mb-8 w-full">
             <div className="flex flex-col gap-4">
               <div className="flex gap-4">
                 <input
@@ -165,12 +168,12 @@ export default function MCQPage() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={`Ask for ${subject} MCQs (e.g., 'Create MCQs about ${subject} topics')`}
-                  className="flex-1 py-3 px-4 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
+                  className="flex-1 py-3 px-4 bg-white border border-gray-300 rounded-lg focus:ring-blue-400 focus:border-blue-400 text-[#222]"
                 />
                 <select
                   value={mcqCount}
                   onChange={(e) => setMcqCount(e.target.value)}
-                  className="py-3 px-4 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
+                  className="py-3 px-4 bg-white border border-gray-300 rounded-lg focus:ring-blue-400 focus:border-blue-400 text-[#222]"
                 >
                   <option value="5">5 MCQs</option>
                   <option value="10">10 MCQs</option>
@@ -181,10 +184,10 @@ export default function MCQPage() {
               <button
                 type="submit"
                 disabled={loading || !input.trim()}
-                className="py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-2 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                className="py-3 px-6 rounded-2xl font-semibold transition-all duration-200 bg-gradient-to-r from-[#e0f2fe] via-[#bae6fd] to-[#7dd3fc] text-[#2563eb] shadow-md hover:brightness-110 hover:scale-105 flex items-center gap-2 disabled:bg-gray-300 disabled:text-gray-400"
               >
                 {loading ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-5 h-5 border-2 border-[#2563eb] border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <Send className="w-5 h-5" />
                 )}
@@ -193,19 +196,19 @@ export default function MCQPage() {
             </div>
           </form>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 w-full">
             {!quizState.showResults ? (
               <>
-                <div className="bg-gray-800/50 p-6 rounded-lg">
+                <div className="bg-gradient-to-r from-[#e0f2fe] via-[#f0f9ff] to-[#bae6fd] p-6 rounded-2xl shadow">
                   <div className="flex justify-between items-center mb-4">
-                    <span className="text-gray-400">
+                    <span className="text-[#2563eb]">
                       Question {quizState.currentQuestion + 1} of {quizState.mcqs.length}
                     </span>
-                    <span className="text-purple-400">
+                    <span className="text-[#0e7490]">
                       {quizState.selectedAnswers.filter(Boolean).length} answered
                     </span>
                   </div>
-                  <h2 className="text-xl font-semibold mb-4">
+                  <h2 className="text-xl font-semibold mb-4 text-[#1e88a8]">
                     {quizState.mcqs[quizState.currentQuestion].question}
                   </h2>
                   <div className="space-y-3">
@@ -213,11 +216,11 @@ export default function MCQPage() {
                       <button
                         key={index}
                         onClick={() => handleAnswerSelect(option)}
-                        className={`w-full text-left p-4 rounded-lg transition-colors ${
-                          quizState.selectedAnswers[quizState.currentQuestion] === option
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
-                        }`}
+                        className={`w-full text-left p-4 rounded-xl transition-all font-medium text-lg shadow-sm border border-transparent
+                          ${quizState.selectedAnswers[quizState.currentQuestion] === option
+                            ? 'bg-[#d1fae5] border-[#6ee7b7] text-[#065f46]'
+                            : 'bg-white hover:bg-[#e0f2fe] text-[#222]'}
+                        `}
                       >
                         {option}
                       </button>
@@ -228,7 +231,7 @@ export default function MCQPage() {
                   <button
                     onClick={handleNextQuestion}
                     disabled={!quizState.selectedAnswers[quizState.currentQuestion]}
-                    className="py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-2 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                    className="py-3 px-6 rounded-2xl font-semibold transition-all duration-200 bg-gradient-to-r from-[#e0f2fe] via-[#bae6fd] to-[#7dd3fc] text-[#2563eb] shadow-md hover:brightness-110 hover:scale-105 flex items-center gap-2 disabled:bg-gray-300 disabled:text-gray-400"
                   >
                     {quizState.currentQuestion === quizState.mcqs.length - 1 ? 'Finish Quiz' : 'Next Question'}
                     <ArrowRight className="w-5 h-5" />
@@ -237,37 +240,37 @@ export default function MCQPage() {
               </>
             ) : (
               <div className="space-y-6">
-                <div className="bg-gray-800/50 p-6 rounded-lg text-center">
-                  <h2 className="text-2xl font-bold mb-2">Quiz Complete!</h2>
-                  <p className="text-xl">
+                <div className="bg-gradient-to-r from-[#e0f2fe] via-[#f0f9ff] to-[#bae6fd] p-6 rounded-2xl shadow text-center">
+                  <h2 className="text-2xl font-bold mb-2 text-[#1e88a8]">Quiz Complete!</h2>
+                  <p className="text-xl text-[#2563eb]">
                     Your score: {quizState.score} out of {quizState.mcqs.length}
                   </p>
-                  <p className="text-gray-400 mt-2">
+                  <p className="text-[#0e7490] mt-2">
                     {Math.round((quizState.score / quizState.mcqs.length) * 100)}% correct
                   </p>
                 </div>
                 <div className="space-y-4">
                   {quizState.mcqs.map((mcq, index) => (
-                    <div key={index} className="bg-gray-800/50 p-6 rounded-lg">
+                    <div key={index} className="bg-gradient-to-r from-[#f0f9ff] via-[#e0f2fe] to-[#bae6fd] p-6 rounded-2xl shadow">
                       <div className="flex items-start gap-2 mb-3">
                         {quizState.selectedAnswers[index] === mcq.correctAnswer ? (
                           <CheckCircle2 className="w-5 h-5 text-green-500 mt-1" />
                         ) : (
                           <XCircle className="w-5 h-5 text-red-500 mt-1" />
                         )}
-                        <h3 className="text-lg font-semibold">{mcq.question}</h3>
+                        <h3 className="text-lg font-semibold text-[#1e88a8]">{mcq.question}</h3>
                       </div>
                       <div className="space-y-2 ml-7">
                         {mcq.options.map((option, optIndex) => (
                           <div
                             key={optIndex}
-                            className={`p-2 rounded ${
-                              option === mcq.correctAnswer
-                                ? 'bg-green-500/20 text-green-300'
+                            className={`p-2 rounded-xl font-medium text-base border border-transparent
+                              ${option === mcq.correctAnswer
+                                ? 'bg-green-100 text-green-700 border-green-200'
                                 : option === quizState.selectedAnswers[index]
-                                ? 'bg-red-500/20 text-red-300'
-                                : 'text-gray-400'
-                            }`}
+                                ? 'bg-red-100 text-red-700 border-red-200'
+                                : 'bg-white text-[#222]'}
+                            `}
                           >
                             {option}
                             {option === mcq.correctAnswer && ' ✓'}
@@ -280,7 +283,7 @@ export default function MCQPage() {
                 <div className="flex justify-center">
                   <button
                     onClick={handleRestart}
-                    className="py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-2"
+                    className="py-3 px-6 rounded-2xl font-semibold transition-all duration-200 bg-gradient-to-r from-[#e0f2fe] via-[#bae6fd] to-[#7dd3fc] text-[#2563eb] shadow-md hover:brightness-110 hover:scale-105 flex items-center gap-2"
                   >
                     Generate New Quiz
                   </button>
@@ -291,5 +294,13 @@ export default function MCQPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function MCQPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <MCQPageInner />
+    </Suspense>
   );
 }

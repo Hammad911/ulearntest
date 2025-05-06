@@ -3,7 +3,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { spawn } from 'child_process';
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -47,10 +47,24 @@ export async function POST(request: Request) {
 
     let output = '';
     let error = '';
+    let chunksProcessed = 0;
+    let totalChunks = 0;
 
     pythonProcess.stdout.on('data', (data) => {
-      output += data.toString();
-      console.log('Python stdout:', data.toString());
+      const dataStr = data.toString();
+      output += dataStr;
+      console.log('Python stdout:', dataStr);
+      
+      // Parse progress updates from Python script
+      try {
+        const progressMatch = dataStr.match(/Progress: (\d+)\/(\d+) chunks/);
+        if (progressMatch) {
+          chunksProcessed = parseInt(progressMatch[1]);
+          totalChunks = parseInt(progressMatch[2]);
+        }
+      } catch (e) {
+        console.error('Error parsing progress:', e);
+      }
     });
 
     pythonProcess.stderr.on('data', (data) => {
@@ -69,7 +83,12 @@ export async function POST(request: Request) {
             { 
               error: 'Python script failed',
               details: error || 'Unknown error occurred',
-              output
+              output,
+              progress: {
+                chunksProcessed,
+                totalChunks,
+                percentage: totalChunks > 0 ? (chunksProcessed / totalChunks) * 100 : 0
+              }
             },
             { status: 500 }
           ));
@@ -77,7 +96,12 @@ export async function POST(request: Request) {
           resolve(NextResponse.json(
             { 
               message: 'File processed successfully',
-              output
+              output,
+              progress: {
+                chunksProcessed,
+                totalChunks,
+                percentage: 100
+              }
             },
             { status: 200 }
           ));
@@ -89,7 +113,12 @@ export async function POST(request: Request) {
         resolve(NextResponse.json(
           { 
             error: 'Failed to start Python process',
-            details: err.message
+            details: err.message,
+            progress: {
+              chunksProcessed,
+              totalChunks,
+              percentage: 0
+            }
           },
           { status: 500 }
         ));
@@ -100,7 +129,12 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { 
         error: 'Error processing file',
-        details: error instanceof Error ? error.message : 'Unknown error occurred'
+        details: error instanceof Error ? error.message : 'Unknown error occurred',
+        progress: {
+          chunksProcessed: 0,
+          totalChunks: 0,
+          percentage: 0
+        }
       },
       { status: 500 }
     );

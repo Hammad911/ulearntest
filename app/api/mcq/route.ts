@@ -8,8 +8,6 @@ const pc = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 });
 
-if (!process.env.PINECONE_INDEX_HOST) throw new Error('PINECONE_INDEX_HOST is not set');
-
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro-exp-03-25" });
 
 // Function to generate embeddings using Gemini
@@ -35,8 +33,10 @@ async function generateEmbedding(text: string, maxRetries = 3): Promise<number[]
 
 async function connectToPinecone(indexName: string) {
   try {
-    const index = pc.index(indexName, process.env.PINECONE_INDEX_HOST!);
-    console.log(`Successfully connected to Pinecone index: ${indexName}`);
+    // Construct the host URL based on the subject
+    const host = `https://${indexName.toLowerCase()}-ofj8ue3.svc.aped-4627-b74a.pinecone.io`;
+    const index = pc.index(indexName, host);
+    console.log(`Successfully connected to Pinecone index: ${indexName} at ${host}`);
     return index;
   } catch (error) {
     console.error(`Failed to connect to Pinecone index: ${indexName}`, error);

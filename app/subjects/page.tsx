@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { BookOpen, Atom, FlaskRound, Leaf } from 'lucide-react'
+import Image from 'next/image'
 
 export default function SubjectSelection() {
   const router = useRouter();
@@ -11,41 +12,40 @@ export default function SubjectSelection() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mt-8 mb-6">Select a Subject</h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+    <div className="min-h-screen flex flex-col items-center bg-[linear-gradient(135deg,_#e0f2fe_0%,_#f0f9ff_20%,_#ffe4e6_40%,_#bae6fd_60%,_#a5f3fc_100%)] text-[#222] p-4">
+      <div className="max-w-4xl w-full flex flex-col items-center">
+        <Image src="/High Res Logo Ulearn Black.svg" alt="ULearn Logo" width={220} height={100} className="mb-4 mt-2" />
+        <h1 className="text-4xl font-extrabold text-center mb-6 tracking-tight" style={{ color: '#1e88a8' }}>
+          Select a Subject
+        </h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
           <button
             onClick={() => navigateToSubject('english')}
-            className="p-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-4 transition-colors duration-200"
+            className="p-8 rounded-2xl font-semibold flex items-center justify-center gap-4 transition-all duration-200 bg-gradient-to-r from-[#e0f2fe] via-[#bae6fd] to-[#7dd3fc] text-[#2563eb] shadow-md hover:brightness-110 hover:scale-105 text-xl"
           >
             <BookOpen className="w-8 h-8" />
-            <span className="text-xl">English</span>
+            <span>English</span>
           </button>
-          
           <button
             onClick={() => navigateToSubject('physics')}
-            className="p-6 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium flex items-center justify-center gap-4 transition-colors duration-200"
+            className="p-8 rounded-2xl font-semibold flex items-center justify-center gap-4 transition-all duration-200 bg-gradient-to-r from-[#a5f3fc] via-[#e0f2fe] to-[#bae6fd] text-[#0e7490] shadow-md hover:brightness-110 hover:scale-105 text-xl"
           >
             <Atom className="w-8 h-8" />
-            <span className="text-xl">Physics</span>
+            <span>Physics</span>
           </button>
-          
           <button
             onClick={() => navigateToSubject('chemistry')}
-            className="p-6 bg-green-600 hover:bg-green-700 rounded-lg font-medium flex items-center justify-center gap-4 transition-colors duration-200"
+            className="p-8 rounded-2xl font-semibold flex items-center justify-center gap-4 transition-all duration-200 bg-gradient-to-r from-[#f0f9ff] via-[#e0f2fe] to-[#bae6fd] text-[#0284c7] shadow-md hover:brightness-110 hover:scale-105 text-xl"
           >
             <FlaskRound className="w-8 h-8" />
-            <span className="text-xl">Chemistry</span>
+            <span>Chemistry</span>
           </button>
-          
           <button
             onClick={() => navigateToSubject('biology')}
-            className="p-6 bg-red-600 hover:bg-red-700 rounded-lg font-medium flex items-center justify-center gap-4 transition-colors duration-200"
+            className="p-8 rounded-2xl font-semibold flex items-center justify-center gap-4 transition-all duration-200 bg-gradient-to-r from-[#ffe4e6] via-[#f0f9ff] to-[#bae6fd] text-[#be185d] shadow-md hover:brightness-110 hover:scale-105 text-xl"
           >
             <Leaf className="w-8 h-8" />
-            <span className="text-xl">Biology</span>
+            <span>Biology</span>
           </button>
         </div>
       </div>

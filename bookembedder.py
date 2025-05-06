@@ -416,8 +416,8 @@ class EnhancedBookEmbedder:
         print(f"Beginning vectorization of {len(chunks)} chunks...")
         
         for i, chunk in enumerate(chunks):
-            if i % 10 == 0:
-                print(f"Processing chunk {i+1}/{len(chunks)}")
+            # Print progress update in the format expected by the frontend
+            print(f"Progress: {i+1}/{len(chunks)} chunks")
             
             # Generate embedding
             embedding = self._generate_embedding_with_retry(chunk.text)

@@ -1,14 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, Brain, Search, Upload } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-
-interface SearchResult {
-  text: string;
-  score: number;
-  chunkNumber: string | number | boolean | null;
-}
+import { BookOpen, Brain } from 'lucide-react'
+import Image from 'next/image'
 
 interface MedicalResponseProps {
   content: string;
@@ -72,136 +66,54 @@ const MedicalResponse = ({ content }: MedicalResponseProps) => {
 };
 
 export default function Home() {
-  const router = useRouter();
-  const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [aiResponse, setAiResponse] = useState('');
-  const [error, setError] = useState('');
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
-    setLoading(true);
-    setError('');
-    setResults([]);
-    setAiResponse('');
-
-    try {
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ query: query.trim() }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to search');
-      }
-
-      setResults(data.results || []);
-      setAiResponse(data.aiResponse || '');
-    } catch (err) {
-      console.error('Search error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred during search');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const navigateToUpload = () => {
-    router.push('/upload');
-  };
-
-  const navigateToSubjects = () => {
-    router.push('/subjects');
-  };
+  const [messages] = useState<{ role: 'user' | 'ai', content: string }[]>([]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mt-8 mb-6">Knowledge Search</h1>
-        
-        {/* Navigation Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[linear-gradient(135deg,_#e0f2fe_0%,_#f0f9ff_20%,_#ffe4e6_40%,_#bae6fd_60%,_#a5f3fc_100%)] text-[#222] p-4">
+      <div className="max-w-4xl w-full flex flex-col items-center">
+        <Image src="/High Res Logo Ulearn Black.svg" alt="ULearn Logo" width={320} height={140} className="mb-6 mt-8" />
+        <h1 className="text-4xl font-extrabold text-center mb-8 tracking-tight" style={{ color: '#1e88a8' }}>
+          ULearn Chatbot
+        </h1>
+        <p className="text-lg text-gray-700 mb-8 font-light">Investing in future</p>
+        <div className="flex flex-col sm:flex-row gap-8 justify-center mt-2 mb-8">
           <button
-            onClick={navigateToUpload}
-            className="py-4 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200"
+            onClick={() => window.location.href = '/upload'}
+            className="py-4 px-10 rounded-2xl font-semibold flex items-center justify-center gap-3 transition-all duration-200 bg-gradient-to-r from-[#e0f2fe] via-[#bae6fd] to-[#7dd3fc] text-[#2563eb] shadow-md hover:brightness-110 hover:scale-105 text-lg"
           >
-            <Upload className="w-5 h-5" />
+            <BookOpen className="w-6 h-6" />
             <span>Upload Textbook</span>
           </button>
-          
           <button
-            onClick={navigateToSubjects}
-            className="py-4 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200"
+            onClick={() => window.location.href = '/subjects'}
+            className="py-4 px-10 rounded-2xl font-semibold flex items-center justify-center gap-3 transition-all duration-200 bg-gradient-to-r from-[#a5f3fc] via-[#e0f2fe] to-[#bae6fd] text-[#0e7490] shadow-md hover:brightness-110 hover:scale-105 text-lg"
           >
-            <BookOpen className="w-5 h-5" />
+            <BookOpen className="w-6 h-6" />
             <span>Browse Subjects</span>
           </button>
         </div>
-        
-        <div className="border-t border-gray-700 my-6"></div>
-        
-        <form onSubmit={handleSearch} className="mb-8">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="relative flex-grow">
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Ask a question..."
-                className="w-full py-3 px-4 pr-12 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
-              />
-              {loading && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <div className="w-5 h-5 border-2 border-gray-300 border-t-purple-500 rounded-full animate-spin"></div>
-                </div>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={loading || !query.trim()}
-              className="py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-2 disabled:bg-gray-600 disabled:cursor-not-allowed"
-            >
-              <Search className="w-5 h-5" />
-              <span>Search</span>
-            </button>
-          </div>
-        </form>
-
-        {error && (
-          <div className="bg-red-900/30 text-red-300 p-4 rounded-lg mb-6">
-            <p>{error}</p>
-          </div>
-        )}
-
-        {aiResponse && (
-          <div className="mb-8">
-            <MedicalResponse content={aiResponse} />
-          </div>
-        )}
-
-        {results.length > 0 && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-300 border-b border-gray-700 pb-2">Related Text Passages</h2>
-            {results.map((result, index) => (
-              <div key={index} className="bg-gray-800/50 p-4 rounded-lg">
-                <div className="text-sm text-gray-400 mb-2">
-                  Similarity Score: {result.score.toFixed(4)} | Chunk: {result.chunkNumber}
-                </div>
-                <div className="text-gray-300 whitespace-pre-line">
-                  {result.text.replace(/\[Similarity Score: [0-9.]+\]\n/, '')}
-                </div>
-              </div>
-            ))}
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-[40vh] w-full">
+            <div className="text-2xl sm:text-3xl font-semibold text-[#2563eb] mb-4 text-center">Welcome to your learning assistant!</div>
+            <div className="text-base sm:text-lg text-[#4a4a4a] text-center max-w-xl">Ask anything from your textbooks, or use the buttons above to get started. Your AI tutor is here to help you learn and grow.</div>
           </div>
         )}
       </div>
+      <main className="flex-1 w-full max-w-2xl px-2 sm:px-0 flex flex-col gap-8 items-center justify-center">
+        {messages.map((msg, idx) => (
+          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}> 
+            <div
+              className={`rounded-2xl px-5 py-3 max-w-[80%] shadow-lg text-base whitespace-pre-line ${
+                msg.role === 'user'
+                  ? 'bg-gradient-to-r from-[#e0f2fe] to-[#bae6fd] text-[#2563eb] self-end'
+                  : 'bg-gradient-to-r from-[#a5f3fc] to-[#e0f2fe] text-[#0e7490] self-start border border-[#bae6fd]'
+              }`}
+            >
+              {msg.role === 'ai' ? <MedicalResponse content={msg.content} /> : msg.content}
+            </div>
+          </div>
+        ))}
+      </main>
     </div>
   );
 }

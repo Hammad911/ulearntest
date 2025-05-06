@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { BookOpen, Brain, Search, FileQuestion } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 interface SearchResult {
   text: string;
@@ -42,36 +43,38 @@ const MedicalResponse = ({ content }: MedicalResponseProps) => {
 
   return (
     <div className="space-y-4 w-full">
-      <div className="text-purple-300 text-sm tracking-wider mb-2">
+      <div className="text-[#a78bfa] text-base tracking-wider mb-2 font-semibold">
         Source: {source}
       </div>
-      
-      {textbook && (
-        <div className="bg-purple-900/30 backdrop-blur-sm rounded-lg p-6 space-y-3">
-          <div className="flex items-center gap-2 text-purple-300">
-            <BookOpen className="w-5 h-5" />
-            <span className="font-semibold">Text Reference</span>
+      <div className="flex justify-center w-full">
+        <div className="bg-white border-2 border-[#7dd3fc] shadow-2xl rounded-3xl p-10 space-y-6 max-w-2xl w-full mt-8">
+          {textbook && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 text-[#2563eb] font-semibold mb-2 text-lg">
+                <BookOpen className="w-6 h-6" />
+                <span>Text Reference</span>
+              </div>
+              <div className="text-[#222] leading-relaxed whitespace-pre-line text-lg">
+                {textbook}
+              </div>
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-2 text-[#0ea5e9] font-semibold mb-2 text-lg">
+              <Brain className="w-6 h-6" />
+              <span>AI Response</span>
+            </div>
+            <div className="text-[#222] leading-relaxed whitespace-pre-line text-lg">
+              {aiGenerated}
+            </div>
           </div>
-          <div className="text-white/90 leading-relaxed whitespace-pre-line">
-            {textbook}
-          </div>
-        </div>
-      )}
-
-      <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 space-y-3">
-        <div className="flex items-center gap-2 text-blue-300">
-          <Brain className="w-5 h-5" />
-          <span className="font-semibold">AI Response</span>
-        </div>
-        <div className="text-white/90 leading-relaxed whitespace-pre-line">
-          {aiGenerated}
         </div>
       </div>
     </div>
   );
 };
 
-export default function SearchPage() {
+function SearchPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const subject = searchParams.get('subject');
@@ -134,20 +137,20 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold capitalize">{subject} Search</h1>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[linear-gradient(135deg,_#e0f2fe_0%,_#f0f9ff_20%,_#ffe4e6_40%,_#bae6fd_60%,_#a5f3fc_100%)] text-[#222] p-4">
+      <div className="max-w-4xl w-full flex flex-col items-center">
+        <Image src="/High Res Logo Ulearn Black.svg" alt="ULearn Logo" width={320} height={200} className="mb-6 mt-8" />
+        <div className="flex justify-between items-center mb-6 w-full">
+          <h1 className="text-3xl font-bold capitalize" style={{ color: '#1e88a8' }}>{subject} Search</h1>
           <button
             onClick={navigateToMCQ}
-            className="py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200"
+            className="py-3 px-6 rounded-2xl font-semibold transition-all duration-200 bg-gradient-to-r from-[#a5f3fc] via-[#e0f2fe] to-[#bae6fd] text-[#0e7490] shadow-md hover:brightness-110 hover:scale-105 flex items-center gap-2"
           >
             <FileQuestion className="w-5 h-5" />
             <span>Practice MCQs</span>
           </button>
         </div>
-        
-        <form onSubmit={handleSearch} className="mb-8">
+        <form onSubmit={handleSearch} className="mb-8 w-full">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-grow">
               <input
@@ -155,7 +158,7 @@ export default function SearchPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={`Ask a question about ${subject}...`}
-                className="w-full py-3 px-4 pr-12 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-white"
+                className="w-full py-3 px-4 pr-12 bg-white border border-gray-300 rounded-lg focus:ring-blue-400 focus:border-blue-400 text-[#222]"
               />
               {loading && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -166,7 +169,7 @@ export default function SearchPage() {
             <button
               type="submit"
               disabled={loading || !query.trim()}
-              className="py-3 px-6 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium flex items-center justify-center gap-2 disabled:bg-gray-600 disabled:cursor-not-allowed"
+              className="py-3 px-6 rounded-2xl font-semibold transition-all duration-200 bg-gradient-to-r from-[#e0f2fe] via-[#bae6fd] to-[#7dd3fc] text-[#2563eb] shadow-md hover:brightness-110 hover:scale-105 flex items-center gap-2 disabled:bg-gray-300 disabled:text-gray-400"
             >
               <Search className="w-5 h-5" />
               <span>Search</span>
@@ -203,5 +206,13 @@ export default function SearchPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SearchPageInner />
+    </Suspense>
   );
 }
