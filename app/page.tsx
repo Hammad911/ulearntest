@@ -96,9 +96,9 @@ export default function Home() {
           <div className="flex flex-col items-center justify-center h-[40vh] w-full">
             <div className="text-2xl sm:text-3xl font-semibold text-[#2563eb] mb-4 text-center">Welcome to your learning assistant!</div>
             <div className="text-base sm:text-lg text-[#4a4a4a] text-center max-w-xl">Ask anything from your textbooks, or use the buttons above to get started. Your AI tutor is here to help you learn and grow.</div>
-          </div>
-        )}
-      </div>
+                </div>
+              )}
+            </div>
       <main className="flex-1 w-full max-w-2xl px-2 sm:px-0 flex flex-col gap-8 items-center justify-center">
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}> 
@@ -110,9 +110,9 @@ export default function Home() {
               }`}
             >
               {msg.role === 'ai' ? <MedicalResponse content={msg.content} /> : msg.content}
-            </div>
-          </div>
-        ))}
+                </div>
+              </div>
+            ))}
       </main>
     </div>
   );

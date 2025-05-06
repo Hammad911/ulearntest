@@ -5,8 +5,22 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Document Embedding System",
-  description: "Upload and process PDF documents for semantic search",
+  title: "ULearn",
+  description: "Your AI-powered learning companion",
+  icons: {
+    icon: [
+      {
+        url: '/High Res Logo Ulearn Black.svg',
+        type: 'image/svg+xml',
+      }
+    ],
+    apple: [
+      {
+        url: '/High Res Logo Ulearn Black.svg',
+        type: 'image/svg+xml',
+      }
+    ]
+  }
 };
 
 export default function RootLayout({

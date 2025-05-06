@@ -6,17 +6,11 @@ import { BookOpen, Brain, Search, FileQuestion } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 
-interface SearchResult {
-  text: string;
-  score: number;
-  chunkNumber: string | number | boolean | null;
-}
-
-interface MedicalResponseProps {
+interface SearchResponseProps {
   content: string;
 }
 
-const MedicalResponse = ({ content }: MedicalResponseProps) => {
+const SearchResponse = ({ content }: SearchResponseProps) => {
   const parseResponse = (text: string) => {
     const source = text.match(/\[SOURCE: ([^\]]+)\]/)?.[1] || '';
     const sections = {
@@ -32,7 +26,7 @@ const MedicalResponse = ({ content }: MedicalResponseProps) => {
       sections.aiGenerated = aiPart?.trim() || '';
     } else {
       sections.aiGenerated = contentWithoutSource
-        .replace(/While Davidson's textbook does not contain specific information about/, '')
+        .replace(/While the textbook does not contain specific information about/, '')
         .trim();
     }
 
@@ -81,7 +75,6 @@ function SearchPageInner() {
   
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<SearchResult[]>([]);
   const [aiResponse, setAiResponse] = useState('');
   const [error, setError] = useState('');
 
@@ -97,8 +90,6 @@ function SearchPageInner() {
 
     setLoading(true);
     setError('');
-    setResults([]);
-    setAiResponse('');
 
     try {
       const response = await fetch('/api/search', {
@@ -118,7 +109,6 @@ function SearchPageInner() {
         throw new Error(data.error || 'Failed to search');
       }
 
-      setResults(data.results || []);
       setAiResponse(data.aiResponse || '');
     } catch (err) {
       console.error('Search error:', err);
@@ -185,23 +175,7 @@ function SearchPageInner() {
 
         {aiResponse && (
           <div className="mb-8">
-            <MedicalResponse content={aiResponse} />
-          </div>
-        )}
-
-        {results.length > 0 && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-300 border-b border-gray-700 pb-2">Related Text Passages</h2>
-            {results.map((result, index) => (
-              <div key={index} className="bg-gray-800/50 p-4 rounded-lg">
-                <div className="text-sm text-gray-400 mb-2">
-                  Similarity Score: {result.score.toFixed(4)} | Chunk: {result.chunkNumber}
-                </div>
-                <div className="text-gray-300 whitespace-pre-line">
-                  {result.text.replace(/\[Similarity Score: [0-9.]+\]\n/, '')}
-                </div>
-              </div>
-            ))}
+            <SearchResponse content={aiResponse} />
           </div>
         )}
       </div>
