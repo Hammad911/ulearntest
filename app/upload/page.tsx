@@ -105,11 +105,14 @@ export default function Home() {
               </label>
               <input
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.docx"
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-400 focus:border-blue-400"
                 required
               />
+              <p className="text-sm text-gray-500 mt-1">
+                Supported formats: PDF and DOCX files
+              </p>
             </div>
             <button
               type="submit"

@@ -254,7 +254,7 @@ function MCQPageInner() {
                     <div key={index} className="bg-gradient-to-r from-[#f0f9ff] via-[#e0f2fe] to-[#bae6fd] p-6 rounded-2xl shadow">
                       <div className="flex items-start gap-2 mb-3">
                         {quizState.selectedAnswers[index] === mcq.correctAnswer ? (
-                          <CheckCircle2 className="w-5 h-5 text-green-500 mt-1" />
+                          <CheckCircle2 className="w-5 h-5 text-yellow-500 mt-1" />
                         ) : (
                           <XCircle className="w-5 h-5 text-red-500 mt-1" />
                         )}

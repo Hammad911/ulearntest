@@ -35,5 +35,6 @@ next-env.d.ts
 # uploads
 /uploads/
 *.pdf
+*.docx
 .env
 .env
