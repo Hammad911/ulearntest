@@ -8,7 +8,7 @@ const pc = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 })
 
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro-exp-03-25' })
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-04-17' })
 
 // Function to generate embeddings using Gemini
 async function generateEmbedding(text: string, maxRetries = 3): Promise<number[]> {
@@ -44,6 +44,32 @@ async function connectToPinecone(indexName: string) {
   }
 }
 
+// Function to check if query is relevant to subject
+async function isQueryRelevantToSubject(query: string, subject: string): Promise<boolean> {
+  const relevancePrompt = `You are a subject matter expert. Determine if the following question is relevant to ${subject}:
+
+Question: ${query}
+
+Respond with ONLY "YES" if the question is relevant to ${subject}, or "NO" if it's not.
+Consider:
+1. Is this a topic typically covered in ${subject}?
+2. Would a ${subject} textbook likely contain this information?
+3. Is this a fundamental concept in ${subject}?
+4. Is this a basic definition or concept that should be in any ${subject} textbook?
+5. Even if the exact term isn't found, would this be a core concept in ${subject}?
+
+Answer:`;
+
+  try {
+    const result = await model.generateContent(relevancePrompt)
+    const response = result.response.text().trim().toUpperCase()
+    return response === "YES"
+  } catch (error) {
+    console.error('Error checking query relevance:', error)
+    return false
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { query, subject } = await req.json()
@@ -61,6 +87,9 @@ export async function POST(req: Request) {
         { status: 400 }
       )
     }
+
+    // First check if query is relevant to subject
+    const isRelevant = await isQueryRelevantToSubject(query, subject)
 
     // Generate embedding for the query
     const embedding = await generateEmbedding(query)
@@ -81,8 +110,42 @@ export async function POST(req: Request) {
       .map((match) => match.metadata?.text || '')
       .join('\n\n')
 
+    // Determine if we should use fallback knowledge
+    const shouldUseFallback = isRelevant && 
+      (queryResponse.matches.length === 0 || 
+       queryResponse.matches.every(match => (match.score ?? 0) < 0.5))
+
     // Create a prompt for the AI
-    const prompt = `You are a ${subject} information retrieval system. Your task is to provide information exclusively from the textbook content.
+    const prompt = shouldUseFallback
+      ? `You are a ${subject} information retrieval system. The question appears to be about ${subject}, but the textbook doesn't contain specific information about it.
+
+Question: ${query}
+
+Textbook content (if any):
+${context}
+
+Instructions:
+1. Since this is a ${subject} question but the textbook doesn't have specific information:
+   - Provide a general answer based on ${subject} knowledge
+   - Try to maintain the style and terminology similar to a ${subject} textbook
+   - Keep the information accurate and educational
+   - If possible, relate it to concepts that might be in the textbook
+   - For basic definitions and fundamental concepts, provide a clear, textbook-style explanation
+   - If this is a core concept in ${subject}, explain it as if it were from a textbook
+2. Clearly indicate this is supplementary information
+3. Keep the response focused and educational
+4. Use proper ${subject} terminology
+5. If the question is too complex or outside the scope of basic ${subject}, state this
+6. For basic definitions and fundamental concepts, provide a more detailed explanation
+
+Format your response:
+[SOURCE: ${subject} Knowledge]
+[Your response]
+
+If the question is too complex:
+[SOURCE: ${subject} Knowledge]
+This question requires more advanced ${subject} knowledge than what would typically be covered in a basic textbook.`
+      : `You are a ${subject} information retrieval system. Your task is to provide information exclusively from the textbook content.
 
 Question: ${query}
 
@@ -123,7 +186,8 @@ The textbook does not contain information about [topic].`;
         score: match.score,
         chunkNumber: match.metadata?.chunkNumber
       })),
-      aiResponse: response
+      aiResponse: response,
+      usedFallback: shouldUseFallback
     })
   } catch (error) {
     console.error('Search error:', error)

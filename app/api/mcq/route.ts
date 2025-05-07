@@ -8,7 +8,7 @@ const pc = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY!
 });
 
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro-exp-03-25" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-04-17" });
 
 // Function to generate embeddings using Gemini
 async function generateEmbedding(text: string, maxRetries = 3): Promise<number[]> {
