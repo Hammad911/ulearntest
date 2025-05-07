@@ -76,22 +76,46 @@ export async function POST(req: Request) {
 
     // Use the subject name directly as the index name
     const indexName = subject;
-
-    // Connect to Pinecone and query
     const index = await connectToPinecone(indexName);
-    const queryResponse = await index.namespace('default').query({
-      vector: embedding,
-      topK: Math.min(validCount * 2, 20), // Get more context for more MCQs
-      includeMetadata: true,
-    });
+
+    let allMatches = [];
+    if (subject === 'physics') {
+      // Dynamically discover all chapter namespaces for physics
+      const stats = await index.describeIndexStats();
+      const allNamespaces = Object.keys(stats.namespaces || {});
+      const chapterNamespaces = allNamespaces.filter(ns => ns.startsWith('chapter_'));
+      for (const ns of chapterNamespaces) {
+        const nsResponse = await index.namespace(ns).query({
+          vector: embedding,
+          topK: Math.min(validCount * 2, 20),
+          includeMetadata: true,
+        });
+        allMatches.push(...(nsResponse.matches || []));
+      }
+      // Sort and take top N
+      allMatches = allMatches.sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, Math.min(validCount * 2, 20));
+    } else {
+      const queryResponse = await index.namespace('default').query({
+        vector: embedding,
+        topK: Math.min(validCount * 2, 20),
+        includeMetadata: true,
+      });
+      allMatches = queryResponse.matches || [];
+    }
 
     // Extract relevant context from Pinecone results
-    const context = queryResponse.matches
+    const context = allMatches
       .map((match) => match.metadata?.text || '')
       .join('\n\n');
 
     // Create a prompt for MCQ generation
     const prompt = `Based on the following context from ${subject} textbooks, generate ${validCount} multiple-choice questions. Each question should have 4 options (A, B, C, D) with one correct answer. Mark the correct answer with an asterisk (*).
+
+Instructions:
+- Do NOT reference the context, "provided text," or "according to the passage."
+- Each question must be fully self-contained and understandable on its own.
+- Do NOT use phrases like "according to the above," "based on the context," or similar.
+- Write each question as it would appear in a real exam.
 
 Format each question like this:
 Question 1: [Question text]

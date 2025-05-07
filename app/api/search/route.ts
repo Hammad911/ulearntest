@@ -125,26 +125,15 @@ Textbook content (if any):
 ${context}
 
 Instructions:
-1. Since this is a ${subject} question but the textbook doesn't have specific information:
-   - Provide a general answer based on ${subject} knowledge
-   - Try to maintain the style and terminology similar to a ${subject} textbook
-   - Keep the information accurate and educational
-   - If possible, relate it to concepts that might be in the textbook
-   - For basic definitions and fundamental concepts, provide a clear, textbook-style explanation
-   - If this is a core concept in ${subject}, explain it as if it were from a textbook
-2. Clearly indicate this is supplementary information
-3. Keep the response focused and educational
-4. Use proper ${subject} terminology
-5. If the question is too complex or outside the scope of basic ${subject}, state this
-6. For basic definitions and fundamental concepts, provide a more detailed explanation
+- Provide a concise, direct answer based on ${subject} knowledge.
+- Do NOT use markdown, LaTeX, or any special formatting. Write plain text only.
+- Do NOT use special characters or symbols outside of standard English.
+- Keep your answer short and focused (3-4 sentences max).
+- If the question is too complex or outside the scope of basic ${subject}, state this simply.
 
 Format your response:
 [SOURCE: ${subject} Knowledge]
-[Your response]
-
-If the question is too complex:
-[SOURCE: ${subject} Knowledge]
-This question requires more advanced ${subject} knowledge than what would typically be covered in a basic textbook.`
+[Your response]`
       : `You are a ${subject} information retrieval system. Your task is to provide information exclusively from the textbook content.
 
 Question: ${query}
@@ -153,20 +142,23 @@ Textbook content:
 ${context}
 
 Instructions:
-1. Use ONLY the provided textbook content - do not add external information
-2. Present the information exactly as it appears in the textbook
-3. Remove references to figures, tables, or diagrams
-4. If the textbook content is not relevant to the question, state this clearly
-5. Maintain the exact technical terminology and accuracy from the textbook
-6. Keep the response focused on the textbook content only
-7. If multiple relevant sections exist, combine them while maintaining book accuracy
-8. If the content is too short (less than 2-3 sentences), expand the response by:
+- Use ONLY the provided textbook content - do not add external information
+- Do NOT use markdown, LaTeX, or any special formatting. Write plain text only.
+- Do NOT use special characters or symbols outside of standard English.
+- Present the information exactly as it appears in the textbook
+- Keep your answer short and focused (3-4 sentences max).
+- Remove references to figures, tables, or diagrams
+- If the textbook content is not relevant to the question, state this clearly
+- Maintain the exact technical terminology and accuracy from the textbook
+- Keep the response focused on the textbook content only
+- If multiple relevant sections exist, combine them while maintaining book accuracy
+- If the content is too short (less than 2-3 sentences), expand the response by:
    - Providing more context from surrounding content
    - Explaining related concepts mentioned in the text
    - Breaking down complex terms or ideas
    - Adding relevant examples from the text
    - Maintaining the exact terminology and accuracy from the textbook
-9. If the content is too long, prioritize the most important parts that directly answer the question
+- If the content is too long, prioritize the most important parts that directly answer the question
 
 Format your response:
 [SOURCE: ${subject} Textbook]

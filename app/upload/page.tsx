@@ -9,6 +9,16 @@ interface Progress {
   percentage: number;
 }
 
+interface ProgressMessage {
+  type: 'progress' | 'message' | 'error' | 'complete';
+  message?: string;
+  details?: string;
+  chunksProcessed?: number;
+  totalChunks?: number;
+  percentage?: number;
+  output?: string;
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [indexName, setIndexName] = useState('');
@@ -21,6 +31,7 @@ export default function Home() {
     totalChunks: 0,
     percentage: 0
   });
+  const [processingMessages, setProcessingMessages] = useState<string[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +44,7 @@ export default function Home() {
     setError('');
     setMessage('');
     setDetails('');
+    setProcessingMessages([]);
     setProgress({
       chunksProcessed: 0,
       totalChunks: 0,
@@ -49,21 +61,64 @@ export default function Home() {
         body: formData,
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to upload file');
+        throw new Error('Failed to upload file');
       }
 
-      setMessage(data.message || 'File uploaded and processed successfully!');
-      setDetails(data.output || '');
-      setProgress(data.progress || {
-        chunksProcessed: 0,
-        totalChunks: 0,
-        percentage: 0
-      });
-      setFile(null);
-      setIndexName('');
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response stream available');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        // Parse the SSE data
+        const text = new TextDecoder().decode(value);
+        const lines = text.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6)) as ProgressMessage;
+              
+              switch (data.type) {
+                case 'progress':
+                  if (data.chunksProcessed && data.totalChunks) {
+                    setProgress({
+                      chunksProcessed: data.chunksProcessed,
+                      totalChunks: data.totalChunks,
+                      percentage: data.percentage || 0
+                    });
+                  }
+                  break;
+                case 'message':
+                  if (data.message) {
+                    setProcessingMessages(prev => [...prev, data.message!]);
+                  }
+                  break;
+                case 'error':
+                  setError(data.message || 'An error occurred');
+                  if (data.details) {
+                    setDetails(data.details);
+                  }
+                  break;
+                case 'complete':
+                  setMessage(data.message || 'File processed successfully');
+                  if (data.output) {
+                    setDetails(data.output);
+                  }
+                  setFile(null);
+                  setIndexName('');
+                  break;
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e);
+            }
+          }
+        }
+      }
     } catch (err) {
       const errorData = err instanceof Error ? err.message : 'An error occurred';
       setError(errorData);
@@ -123,18 +178,42 @@ export default function Home() {
             </button>
           </form>
 
-          {loading && progress.totalChunks > 0 && (
-            <div className="mt-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
-                <span>Processing chunks: {progress.chunksProcessed}/{progress.totalChunks}</span>
-                <span>{Math.round(progress.percentage)}%</span>
+          {loading && (
+            <div className="mt-4 space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-sm font-medium text-gray-700">Processing Status</h3>
+                  <span className="text-sm font-medium text-blue-600">
+                    {progress.totalChunks > 0 ? `${Math.round(progress.percentage)}%` : 'Starting...'}
+                  </span>
+                </div>
+                
+                {progress.totalChunks > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm text-gray-600 mb-1">
+                      <span>Chunks Processed: {progress.chunksProcessed}</span>
+                      <span>Total Chunks: {progress.totalChunks}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div
+                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${progress.percentage}%` }}
+                      ></div>
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div
-                  className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                  style={{ width: `${progress.percentage}%` }}
-                ></div>
-              </div>
+              
+              {processingMessages.length > 0 && (
+                <div className="bg-gray-50 rounded-lg p-4 max-h-48 overflow-y-auto">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Processing Log:</h3>
+                  <div className="space-y-1">
+                    {processingMessages.map((msg, index) => (
+                      <p key={index} className="text-sm text-gray-600">{msg}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -99,7 +99,7 @@ function SearchPageInner() {
         },
         body: JSON.stringify({ 
           query: query.trim(),
-          subject: subject
+          subject: subject === 'logical-reasoning' ? 'logicalreasoning' : subject
         }),
       });
 
@@ -119,7 +119,7 @@ function SearchPageInner() {
   };
 
   const navigateToMCQ = () => {
-    router.push(`/mcqs?subject=${subject}`);
+    router.push(`/mcqs?subject=${subject === 'logical-reasoning' ? 'logicalreasoning' : subject}`);
   };
 
   if (!subject) {

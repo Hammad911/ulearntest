@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { BookOpen, Atom, FlaskRound, Leaf } from 'lucide-react'
+import { BookOpen, Atom, FlaskRound, Leaf, BrainCircuit } from 'lucide-react'
 import Image from 'next/image'
 
 export default function SubjectSelection() {
@@ -46,6 +46,13 @@ export default function SubjectSelection() {
           >
             <Leaf className="w-8 h-8" />
             <span>Biology</span>
+          </button>
+          <button
+            onClick={() => navigateToSubject('logicalreasoning')}
+            className="p-8 rounded-2xl font-semibold flex items-center justify-center gap-4 transition-all duration-200 bg-gradient-to-r from-[#ede9fe] via-[#ddd6fe] to-[#c4b5fd] text-[#6d28d9] shadow-md hover:brightness-110 hover:scale-105 text-xl"
+          >
+            <BrainCircuit className="w-8 h-8" />
+            <span>Logical Reasoning</span>
           </button>
         </div>
       </div>

@@ -43,10 +43,11 @@ class TextChunk:
     page_num: int = 0
     section: str = ""
     position: int = 0
-    chunk_type: str = "text"  # text, heading, table, etc.
+    chunk_type: str = "text"  # text, heading, mcq, answer, table, etc.
     chapter: str = ""
     subsection: str = ""
     importance_score: float = 0.0
+    mcq_data: Dict[str, Any] = None  # Store MCQ-specific data
 
     def __hash__(self):
         # Create a stable ID based on content
@@ -54,7 +55,7 @@ class TextChunk:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage"""
-        return {
+        data = {
             "text": self.text,
             "page_num": self.page_num,
             "section": self.section,
@@ -64,6 +65,9 @@ class TextChunk:
             "subsection": self.subsection,
             "importance_score": self.importance_score
         }
+        if self.mcq_data:
+            data["mcq_data"] = self.mcq_data
+        return data
 
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> 'TextChunk':
@@ -76,7 +80,8 @@ class TextChunk:
             chunk_type=data.get("chunk_type", "text"),
             chapter=data.get("chapter"),
             subsection=data.get("subsection"),
-            importance_score=data.get("importance_score", 0.0)
+            importance_score=data.get("importance_score", 0.0),
+            mcq_data=data.get("mcq_data")
         )
 
 
@@ -143,6 +148,37 @@ class TextProcessor:
     """Process text for smart chunking"""
     
     @staticmethod
+    def _is_mcq(text: str) -> Tuple[bool, Dict[str, Any]]:
+        """Detect if text is an MCQ and extract its components"""
+        # Common MCQ patterns
+        mcq_patterns = [
+            r'(?i)(\d+)[\.\)]\s*(.*?)\s*\n\s*[aA][\.\)]\s*(.*?)\s*\n\s*[bB][\.\)]\s*(.*?)\s*\n\s*[cC][\.\)]\s*(.*?)\s*\n\s*[dD][\.\)]\s*(.*?)(?:\s*\n\s*Answer:\s*(.*))?',
+            r'(?i)(\d+)[\.\)]\s*(.*?)\s*\n\s*\([aA]\)\s*(.*?)\s*\n\s*\([bB]\)\s*(.*?)\s*\n\s*\([cC]\)\s*(.*?)\s*\n\s*\([dD]\)\s*(.*?)(?:\s*\n\s*Answer:\s*(.*))?'
+        ]
+        
+        for pattern in mcq_patterns:
+            match = re.search(pattern, text, re.DOTALL)
+            if match:
+                question_num = match.group(1)
+                question = match.group(2).strip()
+                options = {
+                    'A': match.group(3).strip(),
+                    'B': match.group(4).strip(),
+                    'C': match.group(5).strip(),
+                    'D': match.group(6).strip()
+                }
+                answer = match.group(7).strip() if match.group(7) else None
+                
+                return True, {
+                    'question_num': question_num,
+                    'question': question,
+                    'options': options,
+                    'answer': answer
+                }
+        
+        return False, None
+
+    @staticmethod
     def extract_structure(pages: List[Dict[str, Any]]) -> Tuple[List[TextChunk], Dict[str, Any]]:
         """Extract document structure and chunks"""
         all_chunks = []
@@ -150,6 +186,7 @@ class TextProcessor:
             "title": "",
             "chapters": [],
             "sections": defaultdict(list),
+            "mcq_sections": defaultdict(list),
             "metadata": {
                 "total_pages": len(pages),
                 "extracted_at": time.time()
@@ -157,6 +194,14 @@ class TextProcessor:
         }
         
         # First pass - detect structure
+        current_chapter = None
+        chapter_patterns = [
+            r'(?:^|\n)(?:CHAPTER|Chapter)\s*#?\s*([0-9IVXLCDM]+)\s+(.+?)(?:\n|$)',  # Handles 'Chapter # 03 Circular Motion'
+            r'(?:^|\n)(?:CHAPTER|Chapter)\s+([0-9IVXLCDM]+)[.\s]+(.+?)(?:\n|$)',
+            r'(?:^|\n)(?:Unit|UNIT)\s+([0-9IVXLCDM]+)[.\s]+(.+?)(?:\n|$)',
+            r'(?:^|\n)([0-9IVXLCDM]+)[.\s]+(.+?)(?:\n|$)'
+        ]
+        
         for page_data in pages:
             page_num = page_data["page_num"]
             text = page_data["text"]
@@ -167,14 +212,24 @@ class TextProcessor:
                 if title_match:
                     book_structure["title"] = title_match.group(1).strip()
             
-            # Try to detect chapter headings
-            chapter_matches = re.finditer(r'(?:^|\n)(?:CHAPTER|Chapter)\s+([IVXLCDM0-9]+)[.\s]+(.+?)(?:\n|$)', text)
-            for match in chapter_matches:
-                chapter_num = match.group(1)
-                chapter_title = match.group(2).strip()
-                chapter_info = {"number": chapter_num, "title": chapter_title, "page": page_num}
-                book_structure["chapters"].append(chapter_info)
-                
+            # Try to detect chapter headings using multiple patterns
+            for pattern in chapter_patterns:
+                chapter_matches = re.finditer(pattern, text)
+                for match in chapter_matches:
+                    chapter_num = match.group(1)
+                    chapter_title = match.group(2).strip()
+                    chapter_info = {
+                        "number": chapter_num,
+                        "title": chapter_title,
+                        "page": page_num,
+                        "full_title": f"Chapter {chapter_num}: {chapter_title}"
+                    }
+                    book_structure["chapters"].append(chapter_info)
+                    current_chapter = chapter_info["full_title"]
+                    break
+                if current_chapter:
+                    break
+        
         # Second pass - create chunks with structural context
         current_chapter = None
         current_section = None
@@ -187,7 +242,7 @@ class TextProcessor:
             # Update current chapter if we're on a chapter page
             for chapter in book_structure["chapters"]:
                 if chapter["page"] == page_num:
-                    current_chapter = f"{chapter['number']}: {chapter['title']}"
+                    current_chapter = chapter["full_title"]
                     break
             
             # Split into semantic chunks - paragraphs
@@ -197,7 +252,24 @@ class TextProcessor:
                 para = para.strip()
                 if not para:
                     continue
-                    
+                
+                # Check if this is an MCQ
+                is_mcq, mcq_data = TextProcessor._is_mcq(para)
+                if is_mcq:
+                    mcq_chunk = TextChunk(
+                        text=para,
+                        page_num=page_num,
+                        section=current_section,
+                        position=chunk_position,
+                        chunk_type="mcq",
+                        chapter=current_chapter,
+                        mcq_data=mcq_data
+                    )
+                    all_chunks.append(mcq_chunk)
+                    chunk_position += 1
+                    book_structure["mcq_sections"][current_chapter].append(mcq_data)
+                    continue
+                
                 # Check if this is a section heading
                 if TextProcessor._is_likely_heading(para):
                     current_section = para
@@ -208,7 +280,7 @@ class TextProcessor:
                         position=chunk_position,
                         chunk_type="heading",
                         chapter=current_chapter,
-                        importance_score=0.9  # Headings are important
+                        importance_score=0.9
                     )
                     all_chunks.append(section_chunk)
                     chunk_position += 1
@@ -216,7 +288,6 @@ class TextProcessor:
                     continue
                 
                 # Process regular paragraph
-                # For long paragraphs, split into semantic chunks
                 if len(para) > 1000:
                     semantic_chunks = TextProcessor._split_into_semantic_chunks(para)
                     for i, chunk_text in enumerate(semantic_chunks):
@@ -250,7 +321,7 @@ class TextProcessor:
         return [p.strip() for p in paragraphs if p.strip()]
     
     @staticmethod
-    def _split_into_semantic_chunks(text: str, max_chunk_size: int = 600) -> List[str]:
+    def _split_into_semantic_chunks(text: str, max_chunk_size: int = 2000) -> List[str]:
         """Split text into semantic chunks respecting sentence boundaries"""
         try:
             sentences = sent_tokenize(text)
@@ -359,7 +430,21 @@ class EnhancedBookEmbedder:
             print(f"Error initializing index: {e}")
             traceback.print_exc()
             raise
-    
+
+    def _get_chapter_namespace(self, chapter: str) -> str:
+        """Generate a namespace for a chapter"""
+        if not chapter:
+            return 'default'
+        # Create a clean namespace name from chapter
+        # Remove special characters and convert to lowercase
+        clean_chapter = re.sub(r'[^a-zA-Z0-9\s]', '', chapter.lower())
+        # Replace spaces with underscores
+        clean_chapter = re.sub(r'\s+', '_', clean_chapter)
+        # Ensure the namespace is not too long
+        if len(clean_chapter) > 50:
+            clean_chapter = clean_chapter[:50]
+        return f"chapter_{clean_chapter}"
+
     def process_document(self, file_path: str, book_id: str = None) -> str:
         """Process document and store embeddings with enhanced chunking"""
         # Generate a unique ID for this book if not provided
@@ -391,12 +476,45 @@ class EnhancedBookEmbedder:
             json.dump(book_structure, f, indent=2)
         print(f"Saved book metadata to {metadata_path}")
         
-        # Create embeddings and store chunks
-        successful, failed = self._vectorize_and_store_chunks(chunks, book_id)
+        # Group chunks by chapter
+        chapter_chunks = defaultdict(list)
+        for chunk in chunks:
+            chapter = chunk.chapter or 'default'
+            chapter_chunks[chapter].append(chunk)
         
-        print("\nProcessing Complete:")
-        print(f"Successfully processed and stored: {successful} chunks")
-        print(f"Failed chunks: {failed}")
+        print("\nDetected chapters:")
+        for chapter in chapter_chunks.keys():
+            print(f"- {chapter}")
+        
+        # Process each chapter separately
+        total_successful = 0
+        total_failed = 0
+        
+        for chapter, chapter_chunk_list in chapter_chunks.items():
+            print(f"\nProcessing chapter: {chapter}")
+            print(f"Number of chunks in chapter: {len(chapter_chunk_list)}")
+            
+            # Create chapter namespace
+            chapter_namespace = self._get_chapter_namespace(chapter)
+            print(f"Using namespace: {chapter_namespace}")
+            
+            # Process chunks for this chapter
+            successful, failed = self._vectorize_and_store_chunks(
+                chapter_chunk_list, 
+                book_id,
+                namespace=chapter_namespace
+            )
+            
+            total_successful += successful
+            total_failed += failed
+            
+            print(f"Chapter {chapter} complete:")
+            print(f"Successfully processed: {successful} chunks")
+            print(f"Failed chunks: {failed}")
+        
+        print("\nOverall Processing Complete:")
+        print(f"Total successfully processed: {total_successful} chunks")
+        print(f"Total failed chunks: {total_failed}")
         
         # Verify final index state
         try:
@@ -406,18 +524,29 @@ class EnhancedBookEmbedder:
             print(f"Error getting final stats: {e}")
         
         return book_id
-    
-    def _vectorize_and_store_chunks(self, chunks: List[TextChunk], book_id: str) -> Tuple[int, int]:
+
+    def _vectorize_and_store_chunks(self, chunks: List[TextChunk], book_id: str, namespace: str = 'default') -> Tuple[int, int]:
         """Generate embeddings and store chunks in batches"""
         total_vectors = []
         successful_insertions = 0
         failed_chunks = 0
+        batch_size = 100  # Increased from 50 to 100 for better throughput
         
-        print(f"Beginning vectorization of {len(chunks)} chunks...")
+        total_chunks = len(chunks)
+        print(f"Beginning vectorization of {total_chunks} chunks...")
+        
+        # Progress tracking
+        last_progress_update = time.time()
+        progress_interval = 1  # Update progress every second
         
         for i, chunk in enumerate(chunks):
-            # Print progress update in the format expected by the frontend
-            print(f"Progress: {i+1}/{len(chunks)} chunks")
+            current_time = time.time()
+            
+            # Update progress less frequently to reduce console spam
+            if current_time - last_progress_update >= progress_interval:
+                progress = (i + 1) / total_chunks * 100
+                print(f"Progress: {progress:.1f}% ({i+1}/{total_chunks} chunks)")
+                last_progress_update = current_time
             
             # Generate embedding
             embedding = self._generate_embedding_with_retry(chunk.text)
@@ -429,13 +558,12 @@ class EnhancedBookEmbedder:
                 
                 # Get chunk data and clean any None/null values
                 chunk_data = chunk.to_dict()
-                # Clean metadata - Pinecone doesn't accept null values
                 cleaned_metadata = {}
                 for key, value in chunk_data.items():
                     if value is not None:
                         cleaned_metadata[key] = value
                     else:
-                        cleaned_metadata[key] = ""  # Replace None with empty string
+                        cleaned_metadata[key] = ""
                         
                 vector = {
                     "id": chunk_id,
@@ -450,24 +578,33 @@ class EnhancedBookEmbedder:
                 total_vectors.append(vector)
                 
                 # Batch upload when reaching batch size or at the end
-                if len(total_vectors) >= 50 or i == len(chunks) - 1:
+                if len(total_vectors) >= batch_size or i == len(chunks) - 1:
                     try:
-                        print(f"Upserting batch of {len(total_vectors)} vectors...")
+                        print(f"Upserting batch of {len(total_vectors)} vectors to namespace {namespace}...")
                         batch_ids = [v['id'] for v in total_vectors]
                         
-                        # Upsert vectors
-                        self.index.upsert(
-                            vectors=total_vectors,
-                            namespace=self.namespace
-                        )
+                        # Upsert vectors with retry mechanism
+                        max_retries = 3
+                        for retry in range(max_retries):
+                            try:
+                                self.index.upsert(
+                                    vectors=total_vectors,
+                                    namespace=namespace
+                                )
+                                break
+                            except Exception as e:
+                                if retry == max_retries - 1:
+                                    raise
+                                print(f"Retry {retry + 1}/{max_retries} due to error: {e}")
+                                time.sleep(2 ** retry)  # Exponential backoff
                         
                         # Wait for consistency
-                        time.sleep(2)
+                        time.sleep(1)  # Reduced from 2 to 1 second
                         
                         # Verify insertion (only check first vector to save time)
-                        if self._verify_vector_insertion([batch_ids[0]]):
+                        if self._verify_vector_insertion([batch_ids[0]], namespace):
                             successful_insertions += len(total_vectors)
-                            print(f"Successfully verified insertion of batch {i//50 + 1}")
+                            print(f"Successfully verified insertion of batch {i//batch_size + 1}")
                         else:
                             print("Warning: Could not verify vector insertion")
                             
@@ -480,9 +617,13 @@ class EnhancedBookEmbedder:
                         traceback.print_exc()
             else:
                 failed_chunks += 1
+            
+            # Add a small delay every 1000 chunks to prevent rate limiting
+            if (i + 1) % 1000 == 0:
+                time.sleep(1)
         
         return successful_insertions, failed_chunks
-    
+
     def _generate_embedding_with_retry(self, text: str, max_retries: int = 3) -> Optional[List[float]]:
         """Generate embedding with retry mechanism"""
         for attempt in range(max_retries):
@@ -502,18 +643,18 @@ class EnhancedBookEmbedder:
                     print("Failed to generate embedding after all retries")
                     return None
     
-    def _verify_vector_insertion(self, batch_ids: List[str]) -> bool:
+    def _verify_vector_insertion(self, batch_ids: List[str], namespace: str = 'default') -> bool:
         """Verify that vectors were properly inserted"""
         try:
             # Fetch a sample vector to verify insertion
             sample_id = batch_ids[0]
-            fetch_response = self.index.fetch(ids=[sample_id], namespace=self.namespace)
+            fetch_response = self.index.fetch(ids=[sample_id], namespace=namespace)
             return sample_id in fetch_response['vectors']
         except Exception as e:
             print(f"Error verifying vector insertion: {e}")
             return False
-    
-    def semantic_search(self, query: str, book_id: str = None, top_k: int = 5, 
+
+    def semantic_search(self, query: str, book_id: str = None, chapter: str = None, top_k: int = 5, 
                         include_context: bool = True, similarity_cutoff: float = 0.6) -> List[Dict[str, Any]]:
         """
         Perform semantic search on stored book with enhanced context
@@ -521,6 +662,7 @@ class EnhancedBookEmbedder:
         Args:
             query: The search query text
             book_id: Optional book ID to limit search to a specific book
+            chapter: Optional chapter to limit search to a specific chapter
             top_k: Number of results to return
             include_context: Whether to include neighboring chunks for context
             similarity_cutoff: Minimum similarity score to include in results
@@ -534,15 +676,18 @@ class EnhancedBookEmbedder:
             if query_embedding is None:
                 return []
             
-            # Set up search filters if book_id is provided
+            # Set up search filters
             filter_obj = {"book_id": {"$eq": book_id}} if book_id else None
+            
+            # Determine namespace based on chapter
+            namespace = self._get_chapter_namespace(chapter) if chapter else None
             
             # Perform search
             search_results = self.index.query(
                 vector=query_embedding,
                 top_k=top_k if not include_context else top_k * 2,  # Get more results if including context
                 include_metadata=True,
-                namespace=self.namespace,
+                namespace=namespace,
                 filter=filter_obj
             )
             
@@ -571,7 +716,7 @@ class EnhancedBookEmbedder:
                 
                 # Add contextual chunks if requested
                 if include_context and chunk_id is not None and book_id is not None:
-                    context_chunks = self._get_context_chunks(book_id, chunk_id, seen_chunk_ids)
+                    context_chunks = self._get_context_chunks(book_id, chunk_id, seen_chunk_ids, namespace)
                     results.extend(context_chunks)
             
             # Reorder results by original position if we added context
@@ -586,8 +731,8 @@ class EnhancedBookEmbedder:
             print(f"Search error: {e}")
             traceback.print_exc()
             return []
-    
-    def _get_context_chunks(self, book_id: str, chunk_id: int, seen_ids: set) -> List[Dict[str, Any]]:
+
+    def _get_context_chunks(self, book_id: str, chunk_id: int, seen_ids: set, namespace: str = 'default') -> List[Dict[str, Any]]:
         """Get contextual chunks around the given chunk"""
         try:
             # We want to get surrounding chunks (before and after) for context
@@ -614,7 +759,7 @@ class EnhancedBookEmbedder:
             before_chunks = self.index.query(
                 top_k=2,
                 include_metadata=True,
-                namespace=self.namespace,
+                namespace=namespace,
                 filter=before_filter,
                 vector=None  # Metadata-only query
             )
@@ -623,7 +768,7 @@ class EnhancedBookEmbedder:
             after_chunks = self.index.query(
                 top_k=2,
                 include_metadata=True,
-                namespace=self.namespace,
+                namespace=namespace,
                 filter=after_filter,
                 vector=None  # Metadata-only query
             )
@@ -653,6 +798,95 @@ class EnhancedBookEmbedder:
         except Exception as e:
             print(f"Error getting context chunks: {e}")
             return []
+
+    def search_mcqs(self, topic: str, book_id: str = None, num_questions: int = 5) -> List[Dict[str, Any]]:
+        """
+        Search for MCQs related to a specific topic
+        
+        Args:
+            topic: The topic to search for MCQs about
+            book_id: Optional book ID to limit search to a specific book
+            num_questions: Number of MCQs to return
+            
+        Returns:
+            List of MCQs with their options and answers
+        """
+        try:
+            # Generate query embedding
+            query_embedding = self._generate_embedding_with_retry(topic)
+            if query_embedding is None:
+                return []
+            
+            # Set up search filters
+            filter_obj = {
+                "$and": [
+                    {"chunk_type": {"$eq": "mcq"}},
+                    {"book_id": {"$eq": book_id}} if book_id else {}
+                ]
+            }
+            
+            # Perform search
+            search_results = self.index.query(
+                vector=query_embedding,
+                top_k=num_questions * 2,  # Get more results to filter
+                include_metadata=True,
+                namespace=self.namespace,
+                filter=filter_obj
+            )
+            
+            # Process results
+            mcqs = []
+            for match in search_results['matches']:
+                if match['score'] < 0.6:  # Similarity threshold
+                    continue
+                
+                mcq_data = match['metadata'].get('mcq_data', {})
+                if mcq_data:
+                    mcqs.append({
+                        'question': mcq_data['question'],
+                        'options': mcq_data['options'],
+                        'answer': mcq_data['answer'],
+                        'chapter': match['metadata'].get('chapter', ''),
+                        'section': match['metadata'].get('section', ''),
+                        'relevance_score': match['score']
+                    })
+                
+                if len(mcqs) >= num_questions:
+                    break
+            
+            return mcqs
+            
+        except Exception as e:
+            print(f"Error searching MCQs: {e}")
+            traceback.print_exc()
+            return []
+
+    def generate_quiz(self, topic: str, book_id: str = None, num_questions: int = 5) -> Dict[str, Any]:
+        """
+        Generate a quiz on a specific topic
+        
+        Args:
+            topic: The topic to generate a quiz about
+            book_id: Optional book ID to limit search to a specific book
+            num_questions: Number of questions in the quiz
+            
+        Returns:
+            Quiz with questions, options, and answers
+        """
+        mcqs = self.search_mcqs(topic, book_id, num_questions)
+        
+        if not mcqs:
+            return {
+                "error": f"No MCQs found for topic: {topic}",
+                "quiz": None
+            }
+        
+        return {
+            "topic": topic,
+            "num_questions": len(mcqs),
+            "questions": mcqs,
+            "generated_at": time.time()
+        }
 
 
 def main():
